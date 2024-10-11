@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        .note-container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 20px 0;
+        }
+        .note {
+            background-color: #ffeb3b;
+            margin: 10px 0;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .note table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .note th, .note td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        .note th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        .note td {
+            background-color: #fff;
+            word-wrap: break-word;
+            max-width: 250ch;
+            border: 1px solid #000;
+        }
+        .note td.date-column {
+            background-color: #e0f7fa;
+        }
+        .note input[type="date"] {
+            width: 100%;
+            border: none;
+            background: none;
+            font-size: 16px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .delete-btn, .edit-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 14px;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        .edit-btn {
+            background-color: #4CAF50;
+        }
+        .add-note-btn, .collapse-btn {
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+        .collapse-btn {
+            background-color: #2196F3;
+        }
+        .expired { background-color: #ffcccc; }
+        .week-away { background-color: #ffeb99; }
+        .more-than-week { background-color: #ccffcc; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <button class="add-note-btn" onclick="addNote()">Add New Note</button>
+    <div class="note-container" id="noteContainer">
+        <table>
+            <thead>
+                <tr>
+                    <th>Start Date</th>
+                    <th>Description</th>
+                    <th>Expire Date</th>
+                    <th>Modified By</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="noteTableBody"></tbody>
+        </table>
+    </div>
+    <div class="note-container hidden" id="expiredNoteContainer">
+        <h2>Expired Notes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Start Date</th>
+                    <th>Description</th>
+                    <th>Expire Date</th>
+                    <th>Modified By</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="expiredNoteTableBody"></tbody>
+        </table>
+    </div>
+    <button class="collapse-btn" onclick="toggleExpiredNotes()">Show Expired Notes</button>
+
+    <script>
+        let showExpired = false;
+
+        document.addEventListener('DOMContentLoaded', loadNotes);
+
+        function addNote() {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="date-column"><input type="date"></td>
+                <td contenteditable="true">Write Your Notes Here</td>
+                <td class="date-column"><input type="date"></td>
+                <td class="modified-by">User</td>
+                <td>
+                    <button class="edit-btn" onclick="editRow(this)">Edit</button>
+                    <button class="delete-btn" onclick="deleteNoteWithConfirmation(this)">Delete</button>
+                </td>
+            `;
+            document.getElementById('noteTableBody').appendChild(row);
+            saveNotes();
+        }
+
+        function deleteNoteWithConfirmation(button) {
+            if (confirm("Are you sure you want to delete this note?")) {
+                deleteNote(button);
+            }
+        }
+
+        function deleteNote(button) {
+            button.closest('tr').remove();
+            saveNotes();
+        }
+
+        function saveNotes() {
+            const notes = Array.from(document.querySelectorAll('#noteTableBody tr, #expiredNoteTableBody tr')).map(row => ({
+                startDate: row.querySelector('td:nth-child(1) input').value,
+                description: row.querySelector('td:nth-child(2)').innerText,
+                expireDate: row.querySelector('td:nth-child(3) input').value,
+                modifiedBy: row.querySelector('td:nth-child(4)').innerText,
+                expired: row.closest('tbody').id === 'expiredNoteTableBody'
+            }));
+            localStorage.setItem('notes', JSON.stringify(notes));
+        }
+
+        function loadNotes() {
+            const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+            const noteTableBody = document.getElementById('noteTableBody');
+            const expiredNoteTableBody = document.getElementById('expiredNoteTableBody');
+            notes.forEach(note => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="date-column"><input type="date" value="${note.startDate}" disabled></td>
+                    <td contenteditable="false">${note.description}</td>
+                    <td class="date-column"><input type="date" value="${note.expireDate}" disabled></td>
+                    <td class="modified-by">${note.modifiedBy}</td>
+                    <td>
+                        <button class="edit-btn" onclick="editRow(this)">Edit</button>
+                        <button class="delete-btn" onclick="deleteNoteWithConfirmation(this)">Delete</button>
+                    </td>
+                `;
+                if (note.expired) {
+                    expiredNoteTableBody.appendChild(row);
+                } else {
+                    noteTableBody.appendChild(row);
+                }
+                checkExpiration(row.querySelector('td:nth-child(3) input'));
+            });
+        }
+
+        function checkExpiration(input) {
+            const row = input.closest('tr');
+            const expireDate = new Date(input.value);
+            const today = new Date();
+            const threeDaysAfterExpire = new Date(expireDate);
+            threeDaysAfterExpire.setDate(expireDate.getDate() + 3);
+
+            row.classList.toggle('expired', expireDate < today);
+            row.classList.toggle('week-away', expireDate >= today && expireDate <= threeDaysAfterExpire);
+            row.classList.toggle('more-than-week', expireDate > threeDaysAfterExpire);
+
+            if (today > threeDaysAfterExpire) {
+                document.getElementById('expiredNoteTableBody').appendChild(row);
+            } else {
+                document.getElementById('noteTableBody').appendChild(row);
+            }
+            saveNotes();
+        }
+
+        function editRow(button) {
+            const row = button.closest('tr');
+            const isEditable = row.querySelector('td:nth-child(2)').contentEditable === "true";
+            row.querySelectorAll('td:nth-child(1) input, td:nth-child(2), td:nth-child(3) input').forEach(cell => {
+                cell.disabled = isEditable;
+                cell.contentEditable = !isEditable;
+            });
+            button.innerText = isEditable ? "Edit" : "Save";
+            if (isEditable) {
+                const userName = prompt("Please enter your name:");
+                if (userName) {
+                    const now = new Date();
+                    const date = now.toLocaleDateString();
+                    row.querySelector('.modified-by').innerText = `${userName} on ${date}`;
+                    saveNotes();
+                }
+            }
+        }
+
+        function toggleExpiredNotes() {
+            showExpired = !showExpired;
+            document.getElementById('expiredNoteContainer').classList.toggle('hidden', !showExpired);
+            document.querySelector('.collapse-btn').innerText = showExpired ? 'Hide Expired Notes' : 'Show Expired Notes';
+        }
+    </script>
+</body>
+</html>
